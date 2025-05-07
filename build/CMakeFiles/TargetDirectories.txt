@@ -1,4 +1,0 @@
-/home/danny/Desktop/Projects/computer graphics/Chess-Rendering-Group-Project/build/CMakeFiles/supplemental.dir
-/home/danny/Desktop/Projects/computer graphics/Chess-Rendering-Group-Project/build/CMakeFiles/chessRenderer.dir
-/home/danny/Desktop/Projects/computer graphics/Chess-Rendering-Group-Project/build/CMakeFiles/edit_cache.dir
-/home/danny/Desktop/Projects/computer graphics/Chess-Rendering-Group-Project/build/CMakeFiles/rebuild_cache.dir
