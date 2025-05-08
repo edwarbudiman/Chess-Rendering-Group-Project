@@ -5,8 +5,8 @@
 #include <cmath>
 #include "Eigen/Dense"
 
-#include <meshChecker.hpp>
-#include <object.hpp>
+#include "../headerFiles/meshChecker.hpp"
+#include "../headerFiles/object.hpp"
 
 // Include the implementation directly since we're just testing
 #include "loadModel.cpp"
@@ -68,8 +68,12 @@ void printMeshStats(const Object& obj) {
         const auto& he = (*halfEdges)[i];
         cout << "  HE" << he.id << ":" << endl;
         cout << "    Origin: V" << he.vertex->id << endl;
-        cout << "    Next: HE" << he.next->id << endl;
-        cout << "    Previous: HE" << he.previous.lock()->id << endl;
+        cout << "    Next: HE" << (he.next ? std::to_string(he.next->id) : "None") << endl;
+        if (auto prev_he = he.previous.lock()) {
+            cout << "    Previous: HE" << prev_he->id << endl;
+        } else {
+            cout << "    Previous: None or expired" << endl;
+        }
         if (auto twin = he.twin.lock()) {
             cout << "    Twin: HE" << twin->id << endl;
         } else {

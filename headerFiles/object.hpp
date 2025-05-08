@@ -29,30 +29,42 @@ class Face{
         Face(){}
         Face(int _id): id(_id){}
         std::vector<std::shared_ptr<HalfEdge>> getHalfEdges() const {
-            std::vector<std::shared_ptr<HalfEdge>> halfEdges;
-            std::shared_ptr<HalfEdge> currentHalfEdge = halfEdge.lock();
-            if (!currentHalfEdge) return halfEdges; // Check if lock failed
-            int halfEdgeId = currentHalfEdge->id;
-            do{
-                halfEdges.push_back(currentHalfEdge);
-                currentHalfEdge = currentHalfEdge->next;
-                if (!currentHalfEdge) break; // Safety break if list is malformed
-            }
-            while(currentHalfEdge->id != halfEdgeId);
-            return halfEdges;
+            std::vector<std::shared_ptr<HalfEdge>> face_half_edges;
+            std::shared_ptr<HalfEdge> start_he = halfEdge.lock();
+            
+            if (!start_he) return face_half_edges; // Check if lock failed or face has no HE
+
+            std::shared_ptr<HalfEdge> current_he = start_he;
+            do {
+                face_half_edges.push_back(current_he);
+                current_he = current_he->next;
+                if (!current_he) { // Safety break if list is malformed (e.g., open loop)
+                    // Optionally, log an error or warning here
+                    break;
+                }
+            } while (current_he != start_he); // Compare shared_ptr directly
+            return face_half_edges;
         }
         std::vector<std::shared_ptr<Vertex>> getVertices() const {
-            std::vector<std::shared_ptr<Vertex>> vertices;
-            std::shared_ptr<HalfEdge> currentHalfEdge = halfEdge.lock();
-            if (!currentHalfEdge) return vertices; // Check if lock failed
-            int halfEdgeId = currentHalfEdge->id;
-            do{
-                vertices.push_back(currentHalfEdge->vertex);
-                currentHalfEdge = currentHalfEdge->next;
-                if (!currentHalfEdge) break; // Safety break if list is malformed
-            }
-            while(currentHalfEdge->id != halfEdgeId);
-            return vertices;
+            std::vector<std::shared_ptr<Vertex>> face_vertices;
+            std::shared_ptr<HalfEdge> start_he = halfEdge.lock();
+
+            if (!start_he) return face_vertices; // Check if lock failed or face has no HE
+
+            std::shared_ptr<HalfEdge> current_he = start_he;
+            do {
+                if (current_he->vertex) { // Ensure vertex pointer is valid
+                    face_vertices.push_back(current_he->vertex);
+                } else {
+                    // Optionally, log an error or warning here
+                }
+                current_he = current_he->next;
+                if (!current_he) { // Safety break if list is malformed
+                    // Optionally, log an error or warning here
+                    break;
+                }
+            } while (current_he != start_he); // Compare shared_ptr directly
+            return face_vertices;
         }
 };
 
@@ -64,23 +76,33 @@ class Vertex{
         Eigen::Vector3f textureCoordinates;
         Eigen::Vector3f colour; //if not using texture, in range [0, 255]
         Vertex(int _id): id(_id){}
-        std::vector<std::shared_ptr<Vertex>> getNeighbourVertices(){
+        std::vector<std::shared_ptr<Vertex>> getNeighbourVertices() const {
             std::vector<std::shared_ptr<Vertex>> neighbourhood;
-            std::shared_ptr<HalfEdge> currentHalfEdge = halfEdge.lock();
-            int halfEdgeId = currentHalfEdge->id;
-            if(!currentHalfEdge){
-                return neighbourhood;
-            }
+            std::shared_ptr<HalfEdge> start_he = halfEdge.lock();
+
+            if (!start_he) return neighbourhood; // Vertex might be isolated or not properly linked
+
+            std::shared_ptr<HalfEdge> current_he = start_he;
             do {
-                std::shared_ptr<HalfEdge> twin = currentHalfEdge->twin.lock();
-                if(!currentHalfEdge || !twin || !twin->vertex){
+                std::shared_ptr<HalfEdge> twin = current_he->twin.lock();
+                if (twin && twin->vertex) { // Ensure twin and its vertex are valid
+                    neighbourhood.push_back(twin->vertex);
+                } else {
+                    // This vertex is on a boundary or the mesh is not manifold here
+                    // Optionally, log or handle this case
+                }
+                
+                if (twin) { // Proceed around the vertex using the twin's next
+                    current_he = twin->next;
+                } else { // If no twin, we cannot continue around this vertex in this manner
+                    current_he = nullptr; // Stop the loop
+                }
+
+                if (!current_he) { // Safety break if list is malformed or boundary reached
                     break;
                 }
-                neighbourhood.push_back(twin->vertex);
-                currentHalfEdge = twin->next;
-            }
-            while(currentHalfEdge->id != halfEdgeId);
-            return neighbourhood; 
+            } while (current_he != start_he); // Compare shared_ptr directly
+            return neighbourhood;
         }
 };
 
@@ -93,28 +115,35 @@ class Vertex{
 class Object{
     public:
         std::string textureFile;
-        Object(){}
+        
+        Object() :
+            m_faces(std::make_shared<std::vector<Face>>()),
+            m_halfEdges(std::make_shared<std::vector<HalfEdge>>()),
+            m_vertices(std::make_shared<std::vector<Vertex>>())
+        {}
+
         std::weak_ptr<std::vector<Face>> getFaces() const {
-            return std::make_shared<std::vector<Face>>(faces);
+            return m_faces;
         }
         std::weak_ptr<std::vector<HalfEdge>> getHalfEdges() const {
-            return std::make_shared<std::vector<HalfEdge>>(halfEdges);
+            return m_halfEdges;
         }
         std::weak_ptr<std::vector<Vertex>> getVertices() const {
-            return std::make_shared<std::vector<Vertex>>(vertices);
+            return m_vertices;
         }
-        void setFaces(std::vector<Face> _faces){
-            faces = _faces;
+
+        void setFaces(std::shared_ptr<std::vector<Face>> _faces){
+            m_faces = _faces;
         }
-        void setHalfEdges(std::vector<HalfEdge> _halfEdges){
-            halfEdges = _halfEdges;
+        void setHalfEdges(std::shared_ptr<std::vector<HalfEdge>> _halfEdges){
+            m_halfEdges = _halfEdges;
         }
-        void setVertices(std::vector<Vertex> _vertices){
-            vertices = _vertices;
+        void setVertices(std::shared_ptr<std::vector<Vertex>> _vertices){
+            m_vertices = _vertices;
         }
     private:
-        std::vector<Face> faces;
-        std::vector<HalfEdge> halfEdges;
-        std::vector<Vertex> vertices;
+        std::shared_ptr<std::vector<Face>> m_faces;
+        std::shared_ptr<std::vector<HalfEdge>> m_halfEdges;
+        std::shared_ptr<std::vector<Vertex>> m_vertices;
 
 };

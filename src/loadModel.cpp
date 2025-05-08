@@ -7,8 +7,8 @@
 #include <unordered_map>
 #include "Eigen/Dense"
 
-#include <meshChecker.hpp>
-#include <object.hpp>
+#include "../headerFiles/meshChecker.hpp"
+#include "../headerFiles/object.hpp"
 
 using namespace std;
 using namespace Eigen;
@@ -116,101 +116,159 @@ Vector3f computeFaceNormal(const vector<shared_ptr<Vertex>>& vertices) {
 // Convert raw OBJ data to half-edge structure
 Object meshToHalfEdge(const OBJData& objData) {
     Object object;
-    vector<Vertex> vertices;
-    vector<Face> faces;
-    vector<HalfEdge> halfEdges;
-    
-    // Create vertices
-    for (int i = 0; i < objData.vertices.size(); i++) {
-        Vertex vertex(i);
-        vertex.position = objData.vertices[i];
-        if (i < objData.textureCoords.size()) {
-            vertex.textureCoordinates = Vector3f(objData.textureCoords[i].x(), objData.textureCoords[i].y(), 0);
-        } else {
-            vertex.textureCoordinates = Vector3f(0, 0, 0);
-        }
-        vertices.push_back(vertex);
+
+    auto all_vertices_sptr = make_shared<vector<Vertex>>();
+    auto all_faces_sptr = make_shared<vector<Face>>();
+    auto all_halfedges_sptr = make_shared<vector<HalfEdge>>();
+
+    all_vertices_sptr->reserve(objData.vertices.size());
+    for (size_t i = 0; i < objData.vertices.size(); ++i) {
+        all_vertices_sptr->emplace_back(i); // Assuming Vertex constructor takes id
+        Vertex& current_vertex = all_vertices_sptr->back();
+        current_vertex.position = objData.vertices[i];
+        // Initialize texture coordinates. Proper mapping will happen per face-vertex.
+        current_vertex.textureCoordinates = Vector3f(0, 0, 0);
     }
-    
-    // We'll use this map to keep track of half-edge twins
-    unordered_map<uint64_t, int> edgeMap;
-    
-    int halfEdgeIndex = 0;
-    
-    // Create faces and half-edges
-    for (int faceIdx = 0; faceIdx < objData.faces.size(); faceIdx++) {
-        const auto& faceVertices = objData.faces[faceIdx];
-        if (faceVertices.size() < 3) continue; // Skip invalid faces
-        
-        Face face(faceIdx);
-        vector<shared_ptr<HalfEdge>> faceHalfEdges;
-        
-        // Create half-edges for this face
-        for (int i = 0; i < faceVertices.size(); i++) {
-            HalfEdge halfEdge(halfEdgeIndex);
-            halfEdges.push_back(halfEdge);
-            faceHalfEdges.push_back(make_shared<HalfEdge>(halfEdge));
-            halfEdgeIndex++;
+
+    // Map to find twin half-edges. Key is a pair of vertex indices (min_idx, max_idx).
+    // Value is a weak_ptr to the first half-edge found for that edge.
+    unordered_map<uint64_t, weak_ptr<HalfEdge>> edge_to_halfedge_map;
+
+    int halfEdgeIdCounter = 0;
+    for (size_t faceIdx = 0; faceIdx < objData.faces.size(); ++faceIdx) {
+        const auto& vertex_indices_for_face = objData.faces[faceIdx];
+        if (vertex_indices_for_face.size() < 3) continue;
+
+        // Create Face object
+        all_faces_sptr->emplace_back(faceIdx); // Assuming Face constructor takes id
+        Face& current_face_ref = all_faces_sptr->back();
+        // Use aliasing constructor for shared_ptr to an element in the vector
+        shared_ptr<Face> current_face_sptr(all_faces_sptr, &current_face_ref);
+
+        vector<shared_ptr<HalfEdge>> current_face_he_sptrs;
+        current_face_he_sptrs.reserve(vertex_indices_for_face.size());
+
+        // Create HalfEdge objects for this face
+        for (size_t i = 0; i < vertex_indices_for_face.size(); ++i) {
+            all_halfedges_sptr->emplace_back(halfEdgeIdCounter++); // Assuming HE constructor takes id
+            HalfEdge& current_he_ref = all_halfedges_sptr->back();
+            shared_ptr<HalfEdge> current_he_sptr(all_halfedges_sptr, &current_he_ref); // Aliasing
+
+            current_face_he_sptrs.push_back(current_he_sptr);
+
+            // Set vertex
+            int v_obj_idx = vertex_indices_for_face[i];
+            if (v_obj_idx < 0 || static_cast<size_t>(v_obj_idx) >= all_vertices_sptr->size()) {
+                cerr << "Error: Vertex index " << v_obj_idx << " out of bounds for face " << faceIdx << endl;
+                continue;
+            }
+            shared_ptr<Vertex> he_vertex_sptr(all_vertices_sptr, &(*all_vertices_sptr)[v_obj_idx]);
+            current_he_sptr->vertex = he_vertex_sptr;
+
+            // Set face
+            current_he_sptr->face = current_face_sptr;
+
+            // Set outgoing half-edge for the vertex (if not already set)
+            if (he_vertex_sptr->halfEdge.expired()) {
+                he_vertex_sptr->halfEdge = current_he_sptr;
+            }
+            
+            // Assign texture coordinates to vertex if available for this specific face vertex
+            if (faceIdx < objData.textureIdx.size() && i < objData.textureIdx[faceIdx].size()) {
+                int vt_idx = objData.textureIdx[faceIdx][i];
+                if (vt_idx >= 0 && static_cast<size_t>(vt_idx) < objData.textureCoords.size()) {
+                    // This updates the vertex's main texture coordinate.
+                    // If per-face-vertex texture coordinates are needed, Vertex struct would need to change.
+                    he_vertex_sptr->textureCoordinates = Vector3f(objData.textureCoords[vt_idx].x(), objData.textureCoords[vt_idx].y(), 0.0f);
+                }
+            }
         }
-        
-        // Connect half-edges
-        for (int i = 0; i < faceHalfEdges.size(); i++) {
-            int nextIdx = (i + 1) % faceHalfEdges.size();
-            int prevIdx = (i + faceHalfEdges.size() - 1) % faceHalfEdges.size();
-            
-            // Set next and previous pointers
-            faceHalfEdges[i]->next = faceHalfEdges[nextIdx];
-            faceHalfEdges[i]->previous = weak_ptr<HalfEdge>(faceHalfEdges[prevIdx]);
-            
-            // Set vertex and face
-            int vertIdx = objData.faces[faceIdx][i];
-            shared_ptr<Vertex> vertex = make_shared<Vertex>(vertices[vertIdx]);
-            faceHalfEdges[i]->vertex = vertex;
-            faceHalfEdges[i]->face = make_shared<Face>(face);
-            
-            // Store half-edge reference in vertex
-            vertex->halfEdge = weak_ptr<HalfEdge>(faceHalfEdges[i]);
+
+        // Link next/previous pointers for the face's half-edges
+        for (size_t i = 0; i < current_face_he_sptrs.size(); ++i) {
+            current_face_he_sptrs[i]->next = current_face_he_sptrs[(i + 1) % current_face_he_sptrs.size()];
+            current_face_he_sptrs[i]->previous = current_face_he_sptrs[(i + current_face_he_sptrs.size() - 1) % current_face_he_sptrs.size()];
         }
-        
-        // Set face's half-edge reference
-        face.halfEdge = weak_ptr<HalfEdge>(faceHalfEdges[0]);
-        
-        // Store the twin pairs to connect them later
-        for (int i = 0; i < faceHalfEdges.size(); i++) {
-            int nextIdx = (i + 1) % faceHalfEdges.size();
-            int v1 = objData.faces[faceIdx][i];
-            int v2 = objData.faces[faceIdx][nextIdx];
-            
-            // Create a unique key for edge (v1,v2)
-            uint64_t edgeKey1 = (static_cast<uint64_t>(min(v1, v2)) << 32) | max(v1, v2);
-            uint64_t edgeKey2 = (static_cast<uint64_t>(max(v1, v2)) << 32) | min(v1, v2);
-            
-            // Store the half-edge index
-            if (edgeMap.count(edgeKey1) > 0) {
-                // Found a twin
-                int twinIdx = edgeMap[edgeKey1];
-                faceHalfEdges[i]->twin = weak_ptr<HalfEdge>(faceHalfEdges[twinIdx]);
-                faceHalfEdges[twinIdx]->twin = weak_ptr<HalfEdge>(faceHalfEdges[i]);
+
+        // Set face's starting half-edge
+        if (!current_face_he_sptrs.empty()) {
+            current_face_sptr->halfEdge = current_face_he_sptrs[0];
+        }
+
+        // Link twin half-edges
+        for (size_t i = 0; i < current_face_he_sptrs.size(); ++i) {
+            shared_ptr<HalfEdge> he1 = current_face_he_sptrs[i];
+            // The vertex he1 points TO is its next half-edge's origin vertex
+            shared_ptr<HalfEdge> he1_next = he1->next;
+
+            if (!he1->vertex || !he1_next || !he1_next->vertex) {
+                 cerr << "Error: Null vertex in halfedge for face " << faceIdx << " during twin linking." << endl;
+                 continue;
+            }
+
+            // Edge is from he1->vertex to he1_next->vertex
+            int v1_idx = he1->vertex->id;
+            int v2_idx = he1_next->vertex->id;
+
+            uint64_t edge_key = (static_cast<uint64_t>(min(v1_idx, v2_idx)) << 32) | static_cast<uint64_t>(max(v1_idx, v2_idx));
+
+            if (edge_to_halfedge_map.count(edge_key)) {
+                shared_ptr<HalfEdge> twin_he = edge_to_halfedge_map[edge_key].lock();
+                if (twin_he) {
+                    he1->twin = twin_he; // he1 is from v1 to v2
+                    twin_he->twin = he1; // twin_he was from v2 to v1
+                    edge_to_halfedge_map.erase(edge_key);
+                } else {
+                     // This case (found in map but weak_ptr expired) should ideally not happen with correct logic.
+                     // It might indicate a non-manifold edge processed earlier or an issue.
+                     // For robustness, one might re-insert or log. Here, we'll re-insert.
+                    edge_to_halfedge_map[edge_key] = he1;
+                }
             } else {
-                // No twin found yet, store this edge
-                edgeMap[edgeKey2] = halfEdges.size() - faceHalfEdges.size() + i;
+                edge_to_halfedge_map[edge_key] = he1;
             }
         }
         
         // Compute face normal
-        vector<shared_ptr<Vertex>> faceVerticesPtr;
-        for (auto& he : faceHalfEdges) {
-            faceVerticesPtr.push_back(he->vertex);
+        vector<shared_ptr<Vertex>> temp_face_vertices_sptr;
+        if (auto start_he_locked = current_face_sptr->halfEdge.lock()){
+            shared_ptr<HalfEdge> current_he = start_he_locked;
+            do {
+                if(current_he && current_he->vertex){
+                    temp_face_vertices_sptr.push_back(current_he->vertex);
+                } else {
+                    cerr << "Warning: Null vertex or HE encountered while collecting vertices for normal calculation on face " << faceIdx << endl;
+                    break;
+                }
+                current_he = current_he->next;
+                 if (!current_he) {
+                    cerr << "Warning: Null next HE encountered while collecting vertices for normal calculation on face " << faceIdx << endl;
+                    break;
+                }
+            } while (current_he != start_he_locked);
         }
-        face.normal = computeFaceNormal(faceVerticesPtr);
-        
-        faces.push_back(face);
+        if(temp_face_vertices_sptr.size() >= 3) {
+            current_face_sptr->normal = computeFaceNormal(temp_face_vertices_sptr);
+        } else {
+            current_face_sptr->normal = Vector3f(0,0,1); // Default normal for invalid faces
+            cerr << "Warning: Face " << faceIdx << " has < 3 vertices for normal calculation." << endl;
+        }
     }
     
-    object.setVertices(vertices);
-    object.setFaces(faces);
-    object.setHalfEdges(halfEdges);
-    
+    // Report any unmatched half-edges (boundaries or errors)
+    for(const auto& pair : edge_to_halfedge_map){
+        if(auto he = pair.second.lock()){
+            // These are boundary half-edges or indicate an error (e.g. non-manifold)
+            // For now, we just note they exist. They should not have a twin.
+            // cerr << "Boundary or error: HalfEdge " << he->id << " (from V" << he->vertex->id << ") has no twin." << endl;
+        }
+    }
+
+
+    object.setVertices(all_vertices_sptr);
+    object.setFaces(all_faces_sptr);
+    object.setHalfEdges(all_halfedges_sptr);
+
     return object;
 }
 

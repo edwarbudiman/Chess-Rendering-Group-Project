@@ -1,5 +1,5 @@
 #pragma once
-#include <object.hpp>
+#include "object.hpp"
 #include <cfloat>
 
 bool objectClosed(const Object &object);
