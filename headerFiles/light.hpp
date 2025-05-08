@@ -15,7 +15,7 @@ class Light{
         Light* clone() const{
             return new Light(*this);
         }
-        Eigen::Vector3f SamplePoint(){
+        Eigen::Vector3f SamplePoint() const {
             return position;
         }
 };
@@ -36,7 +36,7 @@ class QuadrilateralAreaLight: Light{
     QuadrilateralAreaLight* clone() const{
         return new QuadrilateralAreaLight(*this);
     }
-    Eigen::Vector3f SamplePoint(){
+    Eigen::Vector3f SamplePoint() const {
         //get random height and length
         float randomHeight = static_cast<float>(rand()) / static_cast<float>(RAND_MAX); //get random float between 0 and 1;
         randomHeight *= height; //make it a random float between 0 and height
@@ -46,11 +46,11 @@ class QuadrilateralAreaLight: Light{
         randomLength *= length;
         randomLength -= length / 2;
 
-        Eigen::Vector4f homoSamplePoint = {randomLength, randomHeight, 0, 0};
+        Eigen::Vector4f homoSamplePoint_local = {randomLength, randomHeight, 0, 0};
         //rotate samplePoint around origin to get coordinates to match
-        homoSamplePoint = rotationMatrix * homoSamplePoint;
-        Eigen::Vector3f samplePoint = position + samplePoint.head(3);
-        return samplePoint;
+        Eigen::Vector4f homoSamplePoint_world = rotationMatrix * homoSamplePoint_local;
+        Eigen::Vector3f finalSamplePoint = position + homoSamplePoint_world.head(3);
+        return finalSamplePoint;
     }
 };
 
@@ -70,7 +70,7 @@ class ellipseAreaLight: Light{
     ellipseAreaLight* clone() const{
         return new ellipseAreaLight(*this);
     }
-    Eigen::Vector3f SamplePoint(){
+    Eigen::Vector3f SamplePoint() const {
         //formula for random point in ellipse from: https://stackoverflow.com/questions/5529148/algorithm-calculate-pseudo-random-point-inside-an-ellipse
         
         //get random float
@@ -87,10 +87,10 @@ class ellipseAreaLight: Light{
         x = x * length/2.0;
         y = y * height/2.0;
 
-        Eigen::Vector4f homoSamplePoint = {x, y, 0, 0};
+        Eigen::Vector4f homoSamplePoint_local = {x, y, 0, 0};
         //rotate samplePoint around origin to get coordinates to match
-        homoSamplePoint = rotationMatrix * homoSamplePoint;
-        Eigen::Vector3f samplePoint = position + samplePoint.head(3);
-        return samplePoint;
+        Eigen::Vector4f homoSamplePoint_world = rotationMatrix * homoSamplePoint_local;
+        Eigen::Vector3f finalSamplePoint = position + homoSamplePoint_world.head(3);
+        return finalSamplePoint;
     }
 };

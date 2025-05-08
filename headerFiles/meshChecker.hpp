@@ -2,7 +2,7 @@
 #include <object.hpp>
 #include <cfloat>
 
-bool objectClosed(Object object);
+bool objectClosed(const Object &object);
 
 Object makeObjectClosed(Object object);
 

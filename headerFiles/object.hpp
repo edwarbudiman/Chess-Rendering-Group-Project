@@ -28,24 +28,28 @@ class Face{
         //auto material;
         Face(){}
         Face(int _id): id(_id){}
-        std::vector<std::shared_ptr<HalfEdge>> getHalfEdges(){
+        std::vector<std::shared_ptr<HalfEdge>> getHalfEdges() const {
             std::vector<std::shared_ptr<HalfEdge>> halfEdges;
             std::shared_ptr<HalfEdge> currentHalfEdge = halfEdge.lock();
+            if (!currentHalfEdge) return halfEdges; // Check if lock failed
             int halfEdgeId = currentHalfEdge->id;
             do{
                 halfEdges.push_back(currentHalfEdge);
                 currentHalfEdge = currentHalfEdge->next;
+                if (!currentHalfEdge) break; // Safety break if list is malformed
             }
             while(currentHalfEdge->id != halfEdgeId);
             return halfEdges;
         }
-        std::vector<std::shared_ptr<Vertex>> getVertices(){
+        std::vector<std::shared_ptr<Vertex>> getVertices() const {
             std::vector<std::shared_ptr<Vertex>> vertices;
             std::shared_ptr<HalfEdge> currentHalfEdge = halfEdge.lock();
+            if (!currentHalfEdge) return vertices; // Check if lock failed
             int halfEdgeId = currentHalfEdge->id;
             do{
                 vertices.push_back(currentHalfEdge->vertex);
                 currentHalfEdge = currentHalfEdge->next;
+                if (!currentHalfEdge) break; // Safety break if list is malformed
             }
             while(currentHalfEdge->id != halfEdgeId);
             return vertices;
@@ -90,13 +94,13 @@ class Object{
     public:
         std::string textureFile;
         Object(){}
-        std::weak_ptr<std::vector<Face>> getFaces(){
+        std::weak_ptr<std::vector<Face>> getFaces() const {
             return std::make_shared<std::vector<Face>>(faces);
         }
-        std::weak_ptr<std::vector<HalfEdge>> getHalfEdges(){
+        std::weak_ptr<std::vector<HalfEdge>> getHalfEdges() const {
             return std::make_shared<std::vector<HalfEdge>>(halfEdges);
         }
-        std::weak_ptr<std::vector<Vertex>> getVertices(){
+        std::weak_ptr<std::vector<Vertex>> getVertices() const {
             return std::make_shared<std::vector<Vertex>>(vertices);
         }
         void setFaces(std::vector<Face> _faces){

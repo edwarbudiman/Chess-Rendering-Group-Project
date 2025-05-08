@@ -13,7 +13,8 @@ include_directories(
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/headerFiles
     ${PROJECT_SOURCE_DIR}/src
-    )
+    "${PROJECT_SOURCE_DIR}/labCode/Danny'sLabCode/HW3/include"  # <-- add this
+)
 
 #add extra .cpp and .hpp files here
 add_library(supplemental SHARED
@@ -24,6 +25,10 @@ add_library(supplemental SHARED
 
 add_executable(chessRenderer main.cpp)
 target_link_libraries(chessRenderer ${OpenCV_LIBRARIES} supplemental)
+
+# Test program for the OBJ loader and half-edge conversion
+add_executable(test_loader src/test_loader.cpp)
+target_link_libraries(test_loader ${OpenCV_LIBRARIES} supplemental)
 
 #add more executables as required for testing:
 #example:
