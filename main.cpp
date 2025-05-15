@@ -4,14 +4,9 @@
 #include <cmath>
 #include "Eigen/Dense"
 
-#include <scene.hpp>
-#include <object.hpp>
-#include <headerFiles/rasterizer.hpp>
-#include <headerFiles/camera.hpp>
-#include <headerFiles/shader.hpp>
 
+#include <object.hpp>
 #include <src/loadModel.cpp>
-#include <src/shader.cpp>
 
 using namespace std;
 using namespace Eigen;
@@ -40,23 +35,28 @@ Matrix4f rotateScene(float angle, Vector3f axis){
     return Matrix4f::Identity();
 }
 
-void renderScene(Scene scene){
-    // Manually create camera for now -- potentially add to scene class
-    Camera camera(Vector3f(0, 0, 10), Vector3f(0, 0, 0), Vector3f(0, 1, 0), 45.0f, 1.0f, 0.1f, 50.0f);
-    std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = texture_fragment_shader;
-
-    // Set up rasterizer
-    rst::Rasterizer r(512, 512);
-    r.clear(rst::Buffers::Colour | rst::Buffers::Depth);
-    r.setView(camera.getViewMatrix());
-    r.setProjection(camera.getProjectionMatrix());
-    r.setFragmentShader(active_shader);
-    // Draw objects
-    r.rasterizeObjects(scene);
-
-}
-
-int main(){
-
+int main() {
+    // Path to a chess model OBJ file
+    string modelPath = "../Models/Stone_Chess_Board/Stone_Chess_Board.obj";
+    
+    cout << "Testing load function from src/loadModel.cpp..." << endl;
+    
+    // Call the external load function directly
+    // We're using load from loadModel.cpp, not our unimplemented loadModel function
+    Object chessBoard = load(modelPath);
+    
+    // Print information about the loaded model
+    cout << "Loaded model information:" << endl;
+    cout << "Number of vertices: " << chessBoard.vertices.size() << endl;
+    cout << "Number of faces: " << chessBoard.faces.size() << endl;
+    cout << "Number of half edges: " << chessBoard.halfEdges.size() << endl;
+    
+    if (!chessBoard.vertices.empty()) {
+        cout << "First vertex position: (" 
+             << chessBoard.vertices[0]->position.x() << ", " 
+             << chessBoard.vertices[0]->position.y() << ", " 
+             << chessBoard.vertices[0]->position.z() << ")" << endl;
+    }
+    
     return 0;
 }
