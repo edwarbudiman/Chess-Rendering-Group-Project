@@ -1,4 +1,0 @@
-/Users/edwarb/projects/uni/computer.graphics/group/Chess-Rendering-Group-Project/build/CMakeFiles/supplemental.dir
-/Users/edwarb/projects/uni/computer.graphics/group/Chess-Rendering-Group-Project/build/CMakeFiles/chessRenderer.dir
-/Users/edwarb/projects/uni/computer.graphics/group/Chess-Rendering-Group-Project/build/CMakeFiles/edit_cache.dir
-/Users/edwarb/projects/uni/computer.graphics/group/Chess-Rendering-Group-Project/build/CMakeFiles/rebuild_cache.dir
