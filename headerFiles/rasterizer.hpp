@@ -38,7 +38,7 @@ public:
 
     void rasterizeObjects(Scene scene);
 
-    void draw(std::vector<std::shared_ptr<Face>> &faces, std::vector<Light> lights);
+    void draw(std::vector<std::shared_ptr<Face>> &faces, std::vector<Light> lights, const Material& currentMaterial);
 
     void setPixel(const Vector2i& point, const Eigen::Vector3f& color);
 
@@ -66,7 +66,7 @@ private:
     std::vector<float> depthBuffer;
     std::vector<float> ssaaDepthBuffer;
 
-    void rasterizeTriangle(std::vector<Vertex> &vertices, std::vector<Eigen::Vector3f> &view_pos, std::vector<Light> &view_lights);
+    void rasterizeTriangle(std::vector<Vertex> &vertices, std::vector<Eigen::Vector3f> &view_pos, std::vector<Light> &view_lights, const Material& currentMaterial);
     void postProcessBuffer();
 
     int getIndex(int x, int y);

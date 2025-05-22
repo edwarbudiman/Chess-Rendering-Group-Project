@@ -5,6 +5,7 @@
 #include <map>
 #include "Eigen/Dense"
 #include <fstream>
+#include <stdexcept> // Added for std::runtime_error
 
 #include "meshChecker.hpp"
 #include "object.hpp"
@@ -156,7 +157,7 @@ Material LoadMaterial(string path, string fileName){
     if(!file.is_open()){
         string badFile = "can't open file ";
         badFile.append(path + fileName);
-        throw badFile; 
+        throw std::runtime_error(badFile); 
     }
 
     Material material;
@@ -262,7 +263,7 @@ Mesh loadFile(string path){
     if(path.substr(path.size() - 4, 4) != ".obj"){
         string badFile = "file not .obj ";
         badFile.append(path);
-        throw badFile; 
+        throw std::runtime_error(badFile); 
     }
 
     std::ifstream file(path);
@@ -270,7 +271,7 @@ Mesh loadFile(string path){
     if(!file.is_open()){
         string badFile = "can't open file ";
         badFile.append(path);
-        throw badFile; 
+        throw std::runtime_error(badFile); 
     }
 
     vector<Vector3f> positions;
@@ -423,6 +424,32 @@ Object meshToHalfEdge(const Mesh& mesh) {
     return object;
 }
 
+// Definition for void loadModel(map<string, Object> &objects, string fileLocation)
+// Moved from original main.cpp context
+void loadModel(map<string, Object> &objects, string fileLocation){
+    cout << "loading model: " << fileLocation << "\n";
+    char delim = '/';
+    vector<string> fileSplit = split(fileLocation, delim); // 'split' is defined in this file
+    string fileName = fileSplit.back();
+    delim = '.';
+    // Ensure there's at least one part after splitting by '.' to avoid error with files like "Makefile"
+    vector<string> nameParts = split(fileName, delim);
+    if (!nameParts.empty()) {
+        fileName = nameParts[0];
+    } else {
+        // Keep original fileName if no '.' found, or handle as an error/log
+        // For now, using original fileName if split by '.' yields nothing.
+    }
+
+    if(objects.count(fileName) > 0){
+        throw std::runtime_error("multiple files with the same name: " + fileName);
+    }
+    cout << "mesh name: " << fileName << "\n";
+    Object object = load(fileLocation, fileName); // 'load' is defined in this file
+    cout << "successfully retreived object!\n";
+    objects[fileName] = object;
+}
+
 Object load(string fileLocation, string fileName) {
     Object object;
     try{
@@ -432,9 +459,13 @@ Object load(string fileLocation, string fileName) {
         cout << "\tmesh successfully made for " << fileName << std::endl;
 
     }
-    catch(string message){
-        message = "in loadModel " + message;
-        throw message;
+    catch(const std::runtime_error& e){ // Catching runtime_error
+        std::string message = "in loadModel " + std::string(e.what());
+        throw std::runtime_error(message); // Re-throwing as runtime_error
+    }
+    catch(const std::string& message) { // Catching any remaining string throws (should be none from this file)
+        std::string newMessage = "in loadModel (caught string): " + message;
+        throw std::runtime_error(newMessage);
     }
     cout << "\tchecking consistency\n";
     if(!objectFacesConsistent){

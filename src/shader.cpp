@@ -7,13 +7,13 @@
 
 Eigen::Vector3f blinn_phong_fragment_shader(const fragment_shader_payload &payload) {
     // Material properties
-    Eigen::Vector3f ka = Eigen::Vector3f(0.005, 0.005, 0.005);
-    Eigen::Vector3f kd = payload.colour;
-    Eigen::Vector3f ks = Eigen::Vector3f(0.7937, 0.7937, 0.7937);
+    Eigen::Vector3f ka = payload.material->ka;
+    Eigen::Vector3f kd = payload.material->kd; // Using material's diffuse color
+    Eigen::Vector3f ks = payload.material->ks;
 
     // Lighting parameters
     Eigen::Vector3f amb_light_intensity{10, 10, 10}; 
-    float p = 150; // Phong exponent (shininess)
+    float p = payload.material->shininessExponant; // Phong exponent (shininess)
 
     // Inputs for Blinn-Phong model
     auto lights = payload.view_lights;
@@ -61,13 +61,13 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload &payload) 
     }
 
     // Material properties
-    Eigen::Vector3f ka = Eigen::Vector3f(0.005, 0.005, 0.005);
-    Eigen::Vector3f kd = texture_color / 255.0f;
-    Eigen::Vector3f ks = Eigen::Vector3f(0.7937, 0.7937, 0.7937);
+    Eigen::Vector3f ka = payload.material->ka;
+    Eigen::Vector3f kd = texture_color / 255.0f; // kd is from texture
+    Eigen::Vector3f ks = payload.material->ks;
 
     // Lighting parameters
     Eigen::Vector3f amb_light_intensity{10, 10, 10};
-    float p = 150;
+    float p = payload.material->shininessExponant;
 
     // Inputs for Blinn-Phong model
     std::vector<Light> lights = payload.view_lights;

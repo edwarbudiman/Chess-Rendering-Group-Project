@@ -5,68 +5,18 @@
 #include "Eigen/Dense"
 #include <filesystem>
 #include <map>
+#include <stdexcept> // Added for std::exception
 
 #include <scene.hpp>
 #include <object.hpp>
 #include <rasterizer.hpp>
 #include <camera.hpp>
 #include <shader.hpp>
-
-#include <loadModel.cpp>
-#include <shader.cpp>
+#include "headerFiles/loadModel.hpp" // Already included shader.hpp via <shader.hpp>
 
 using namespace std;
 using namespace Eigen;
 using namespace filesystem;
-
-void loadModel(map<string, Object> &objects, string fileLocation){
-    cout << "loading model: " << fileLocation << "\n";
-    char delim = '/';
-    vector<string> fileSplit = split(fileLocation, delim);
-    string fileName = fileSplit.back();
-    delim = '.';
-    fileName = split(fileName, delim)[0];
-    if(objects.count(fileName) > 0){
-        string badInput = "multiple files with the same name";
-        throw badInput;
-    }
-    cout << "mesh name: " << fileName << "\n";
-    Object object = load(fileLocation, fileName);
-    cout << "successfully retreived object!\n";
-    objects[fileName] = object;
-}
-
-map<string, Object> loadModels(vector<string> files){
-    map<string, Object> objects;
-    for(string file : files){
-        loadModel(objects, file);
-    }
-    return objects;
-}
-
-void getFiles(vector<string> &files, string folder){
-    for (auto &entry : directory_iterator(folder)){
-        if(entry.is_directory()){
-            getFiles(files, entry.path());
-        }
-        else{
-            string file = entry.path();
-            if(file.substr(file.size() - 4, 4) == ".obj"){
-                files.push_back(file);
-            }
-        }
-    }
-}
-
-map<string, Object> loadModels(string folder){
-    map<string, Object> objects;
-    vector<string> files;
-    getFiles(files, folder);
-    for(string file : files){
-        loadModel(objects, file);
-    }
-    return objects;
-}
 
 void captureImage(){
     
@@ -121,8 +71,8 @@ int main(){
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(time).count();
         cout << "render time: " << hours.count() << ":" << minutes.count() << ":" << seconds << "\n";
     }
-    catch(string message){
-        cerr << "exception occurred, message: " << message << "\n";
+    catch(const std::exception& e){ // Changed to catch std::exception
+        cerr << "exception occurred, message: " << e.what() << "\n"; // Used e.what()
     }
     
     return 0;

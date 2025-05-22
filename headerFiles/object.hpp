@@ -95,8 +95,72 @@ class Vertex{
         }
 
         Eigen::Vector3f computeNormal() {
-            if(this->normal == Eigen::Vector3f(0, 0, 0)){
-                this->normal = halfEdge.lock()->face->normal;
+            if(this->normal == Eigen::Vector3f(0, 0, 0)) { // If normal is not already set
+                Eigen::Vector3f accumulated_normal(0,0,0);
+                std::shared_ptr<HalfEdge> start_he = halfEdge.lock();
+                
+                if (!start_he) { // Should not happen in a valid mesh structure
+                    // Potentially return a default normal or handle error
+                    return Eigen::Vector3f(0,0,1); // Default normal
+                }
+
+                std::shared_ptr<HalfEdge> current_he = start_he;
+                bool first_iteration = true; // To handle do-while logic with a while loop or check before loop
+
+                do {
+                    if (!current_he || !current_he->face) {
+                        // Invalid half-edge or face, skip or handle error
+                        // This might indicate a boundary vertex if twin is null before next
+                        // For now, let's assume manifold meshes for simplicity of circulation
+                        if (current_he && current_he->twin.lock()) {
+                             current_he = current_he->twin.lock()->next;
+                        } else {
+                            // Cannot circulate further, break or handle boundary
+                            break; 
+                        }
+                        if (current_he == start_he && !first_iteration) break; // Avoid infinite loop on malformed geometry
+                        continue;
+                    }
+                    
+                    // Ensure face normal is valid (e.g., not zero)
+                    // Face normals are assumed to be pre-calculated and normalized if needed.
+                    // If face normals themselves can be zero, add a check here.
+                    accumulated_normal += current_he->face->normal;
+
+                    if (!current_he->twin.lock() || !current_he->twin.lock()->next) {
+                        // Boundary edge, cannot continue circulation this way
+                        // This means the vertex is on a boundary of the mesh.
+                        // The loop should correctly terminate if start_he is part of a boundary.
+                        // To correctly handle boundaries, we might need to iterate outgoing edges differently
+                        // or accept partial smoothing. For now, this will sum available faces.
+                        break; 
+                    }
+                    current_he = current_he->twin.lock()->next;
+                    first_iteration = false;
+
+                } while (current_he && current_he != start_he);
+
+                // It's possible that for boundary vertices, the loop above doesn't add all faces.
+                // A more robust way for boundaries is to iterate outgoing edges directly from the vertex if possible.
+                // The current halfEdge circulation (he = he->twin->next) is standard for manifold, closed meshes.
+                // For robustness, let's re-iterate if the first pass was partial due to boundary or if start_he was a boundary itself.
+                // This part can be complex. The instruction was "he = he->twin.lock()->next;"
+                // Let's stick to the simpler loop for now as specified and refine if issues arise.
+                // The provided loop structure `he = he->twin.lock()->next;` implies we are iterating around the vertex.
+
+                if (accumulated_normal.norm() > 0.0001f) { // Check if any normals were accumulated
+                    this->normal = accumulated_normal.normalized();
+                } else {
+                    // Fallback if no face normals found (e.g. isolated vertex or all face normals are zero)
+                    // This could also happen if start_he->face is null.
+                    // Using one face normal as a last resort if start_he->face is valid.
+                    if (start_he && start_he->face) {
+                        this->normal = start_he->face->normal; // Original fallback
+                    } else {
+                        // Absolute fallback: a default normal or keep as zero
+                        this->normal = Eigen::Vector3f(0,0,1); // Or (0,0,0) if preferred
+                    }
+                }
             }
             return this->normal;
         }
