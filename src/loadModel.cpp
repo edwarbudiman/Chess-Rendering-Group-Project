@@ -375,6 +375,6 @@ Object load(string fileLocation, string fileName) {
         message = "in loadModel " + message;
         throw message;
     }
-    //checkMesh(object, fileName);
+    checkMesh(object, fileName);
     return object;
 }

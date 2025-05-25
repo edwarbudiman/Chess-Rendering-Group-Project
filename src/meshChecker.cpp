@@ -5,8 +5,20 @@
 #include <set>
 #include <stack>
 #include <map>
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <numeric>
+#include <limits>
+#include <utility>
+#include <random>
+#include <fstream>
+#include <iomanip>
+#include <filesystem>
 #include <Eigen/Dense>
+
+// On non-macOS platforms, we can include the GCC-specific header if needed
+#if !defined(MACOS_BUILD) && !defined(__APPLE__)
+    #include <bits/stdc++.h>
+#endif
 
 #include <meshChecker.hpp>
 #include <object.hpp>

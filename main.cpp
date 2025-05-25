@@ -77,7 +77,7 @@ Matrix4f rotateScene(float angle, Vector3f axis){
 
 void renderScene(Scene scene){
     // Manually create camera for now -- potentially add to scene class
-    Camera camera(Vector3f(0, 0, 10), Vector3f(0, 0, 0), Vector3f(0, 1, 0), 45.0f, 1.0f, 0.1f, 50.0f);
+    Camera camera(Vector3f(0, 0, 20), Vector3f(0, 0, 0), Vector3f(0, 1, 0), 45.0f, 1.0f, 0.1f, 50.0f);
     std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = texture_fragment_shader;
 
     // Set up rasterizer

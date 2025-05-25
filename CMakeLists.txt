@@ -3,6 +3,14 @@ project(chessRendering)
 
 set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Check if we're on macOS (which uses Clang)
+if(APPLE)
+    # Add a definition that we can use to conditionally include headers
+    add_definitions(-DMACOS_BUILD)
+endif()
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -25,6 +33,7 @@ add_library(supplemental SHARED
 )
 
 add_executable(chessRenderer main.cpp)
+target_link_libraries(supplemental ${OpenCV_LIBRARIES})
 target_link_libraries(chessRenderer ${OpenCV_LIBRARIES} supplemental)
 
 add_executable(checkMesh src/meshChecker.cpp)
