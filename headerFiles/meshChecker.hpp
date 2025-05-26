@@ -5,6 +5,10 @@
 void checkMesh(Object &object, const std::string &fileName);
 bool saveMeshASOBJ(const Object &object);
 
+// Triangulation method configuration (0=Seidel, 1=Fan, 2=Ear Clipping)
+void setTriangulationMethod(int method);
+std::string getTriangulationMethod();
+
 class Node;
 class Trapezoid;
 class SeidelRay;

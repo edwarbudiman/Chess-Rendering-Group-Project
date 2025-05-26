@@ -27,6 +27,16 @@
 using namespace std;
 using namespace Eigen;
 
+// Configuration for triangulation method
+enum TriangulationMethod {
+    SEIDEL_TRIANGULATION,
+    FAN_TRIANGULATION,
+    EAR_CLIPPING_TRIANGULATION
+};
+
+// Global configuration - can be changed to switch triangulation methods
+TriangulationMethod g_triangulationMethod = SEIDEL_TRIANGULATION;
+
 float round1e4(float value) {
     return round(value * 10000.0f) / 10000.0f;
   }
@@ -1425,6 +1435,156 @@ namespace seidel{
         return area;
     }
 
+    // Fan triangulation - simple and fast alternative to Seidel
+    vector<vector<Point>> fanTriangulate(const shared_ptr<Face> &face){
+        vector<vector<Point>> triangles;
+        auto vertices = face->getVertices();
+        
+        if(vertices.size() < 3) return triangles; // Invalid face
+        
+        // Fast path for triangles - same as Seidel optimization
+        if(vertices.size() == 3) {
+            Point A = Point(vertices[0]);
+            Point B = Point(vertices[1]);
+            Point C = Point(vertices[2]);
+            triangles.push_back({A, B, C});
+            return triangles;
+        }
+        
+        // Fast path for quads - same as Seidel optimization
+        if(vertices.size() == 4) {
+            Point A = Point(vertices[0]);
+            Point B = Point(vertices[1]);
+            Point C = Point(vertices[2]);
+            Point D = Point(vertices[3]);
+            triangles = triangulateQuad(A, B, C, D);
+            return triangles;
+        }
+        
+        // Fan triangulation for complex polygons: connect vertex 0 to all non-adjacent vertices
+        for(size_t i = 1; i < vertices.size() - 1; i++) {
+            Point A = Point(vertices[0]);
+            Point B = Point(vertices[i]);
+            Point C = Point(vertices[i + 1]);
+            triangles.push_back({A, B, C});
+        }
+        return triangles;
+    }
+
+    // Ear clipping triangulation - good balance between simplicity and robustness
+    vector<vector<Point>> earClippingTriangulate(const shared_ptr<Face> &face){
+        vector<vector<Point>> triangles;
+        auto vertices = face->getVertices();
+        
+        if(vertices.size() < 3) return triangles; // Invalid face
+        
+        // Fast path for triangles
+        if(vertices.size() == 3) {
+            Point A = Point(vertices[0]);
+            Point B = Point(vertices[1]);
+            Point C = Point(vertices[2]);
+            triangles.push_back({A, B, C});
+            return triangles;
+        }
+        
+        // Fast path for quads
+        if(vertices.size() == 4) {
+            Point A = Point(vertices[0]);
+            Point B = Point(vertices[1]);
+            Point C = Point(vertices[2]);
+            Point D = Point(vertices[3]);
+            triangles = triangulateQuad(A, B, C, D);
+            return triangles;
+        }
+        
+        // Ear clipping for complex polygons
+        vector<Point> polygon;
+        for(auto vertex : vertices) {
+            polygon.push_back(Point(vertex));
+        }
+        
+        // Helper functions for ear clipping
+        auto isConvex = [](const Vector3f& a, const Vector3f& b, const Vector3f& c) -> bool {
+            Vector3f v1 = b - a;
+            Vector3f v2 = c - b;
+            Vector3f cross = v1.cross(v2);
+            return cross.z() > 0; // Assuming CCW winding
+        };
+        
+        auto pointInTriangle = [](const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c) -> bool {
+            Vector3f v0 = c - a;
+            Vector3f v1 = b - a;
+            Vector3f v2 = p - a;
+            
+            float dot00 = v0.dot(v0);
+            float dot01 = v0.dot(v1);
+            float dot02 = v0.dot(v2);
+            float dot11 = v1.dot(v1);
+            float dot12 = v1.dot(v2);
+            
+            float invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+            float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+            float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+            
+            return (u >= 0) && (v >= 0) && (u + v <= 1);
+        };
+        
+        auto isEar = [&](int i, const vector<Point>& poly) -> bool {
+            int n = poly.size();
+            int prev = (i - 1 + n) % n;
+            int next = (i + 1) % n;
+            
+            // Check if ear is convex
+            if (!isConvex(poly[prev].position, poly[i].position, poly[next].position)) {
+                return false;
+            }
+            
+            // Check if any other vertex is inside the ear triangle
+            for (int j = 0; j < n; j++) {
+                if (j == prev || j == i || j == next) continue;
+                if (pointInTriangle(poly[j].position, poly[prev].position, poly[i].position, poly[next].position)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        
+        // Ear clipping algorithm
+        while(polygon.size() > 3) {
+            bool earFound = false;
+            for(int i = 0; i < polygon.size(); i++) {
+                if(isEar(i, polygon)) {
+                    int prev = (i - 1 + polygon.size()) % polygon.size();
+                    int next = (i + 1) % polygon.size();
+                    
+                    // Add triangle
+                    triangles.push_back({polygon[prev], polygon[i], polygon[next]});
+                    
+                    // Remove ear vertex
+                    polygon.erase(polygon.begin() + i);
+                    earFound = true;
+                    break;
+                }
+            }
+            
+            // Fallback to prevent infinite loop
+            if(!earFound) {
+                // Use fan triangulation as fallback
+                for(size_t i = 1; i < polygon.size() - 1; i++) {
+                    triangles.push_back({polygon[0], polygon[i], polygon[i + 1]});
+                }
+                break;
+            }
+        }
+        
+        // Add final triangle
+        if(polygon.size() == 3) {
+            triangles.push_back({polygon[0], polygon[1], polygon[2]});
+        }
+        
+        return triangles;
+    }
+
     vector<vector<Point>> triangulate(const shared_ptr<Face> &face, int &oldFaceID){
         vector<vector<Point>> triangles;
         //check how many sides current face has
@@ -1495,7 +1655,16 @@ void makeObjectTri(Object &object){
     oldFaceID += 1;
 
     auto makeFaceTri = [&](const shared_ptr<Face> face) -> void{
-        vector<vector<seidel::Point>> faceTriangles = seidel::triangulate(face, oldFaceID);
+        vector<vector<seidel::Point>> faceTriangles;
+        
+        // Choose triangulation method based on configuration
+        if (g_triangulationMethod == SEIDEL_TRIANGULATION) {
+            faceTriangles = seidel::triangulate(face, oldFaceID);
+        } else if (g_triangulationMethod == FAN_TRIANGULATION) {
+            faceTriangles = seidel::fanTriangulate(face);
+        } else if (g_triangulationMethod == EAR_CLIPPING_TRIANGULATION) {
+            faceTriangles = seidel::earClippingTriangulate(face);
+        }
         for(const vector<seidel::Point> &triangle : faceTriangles){
             for(const seidel::Point &point : triangle){
                 if(vertexIndex.count(point) == 0){
@@ -1584,6 +1753,26 @@ void makeObjectTri(Object &object){
     object.vertices = vertices;
     object.faces = faces;
     object.halfEdges = halfEdges;
+}
+
+// Function to set triangulation method
+void setTriangulationMethod(int method) {
+    if (method == 0) g_triangulationMethod = SEIDEL_TRIANGULATION;
+    else if (method == 1) g_triangulationMethod = FAN_TRIANGULATION;
+    else if (method == 2) g_triangulationMethod = EAR_CLIPPING_TRIANGULATION;
+    else g_triangulationMethod = SEIDEL_TRIANGULATION; // default
+    
+    cout << "Triangulation method set to: " << getTriangulationMethod() << "\n";
+}
+
+// Function to get current triangulation method
+string getTriangulationMethod() {
+    switch(g_triangulationMethod) {
+        case SEIDEL_TRIANGULATION: return "Seidel";
+        case FAN_TRIANGULATION: return "Fan";
+        case EAR_CLIPPING_TRIANGULATION: return "Ear Clipping";
+        default: return "Unknown";
+    }
 }
 
 void checkMesh(Object &object, const string &fileName){

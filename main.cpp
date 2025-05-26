@@ -12,6 +12,7 @@
 #include <camera.hpp>
 #include <shader.hpp>
 #include <loadModel.hpp>
+#include <meshChecker.hpp>
 
 using namespace std;
 using namespace Eigen;
@@ -61,6 +62,7 @@ map<string, Object> loadModels(string folder){
     vector<string> files;
     getFiles(files, folder);
     for(string file : files){
+        cout << "loading model: " << file << "\n";
         loadModel(objects, file);
     }
     return objects;
@@ -100,6 +102,12 @@ void renderScene(Scene scene){
 
 int main(){
     try{
+        auto initStart = std::chrono::system_clock::now();
+        // Simple configuration: 0=Seidel, 1=Fan, 2=Ear Clipping triangulation
+        int triangulationMethod = 0; // Change this: 0=Seidel, 1=Fan, 2=Ear Clipping
+        setTriangulationMethod(triangulationMethod);
+        
+        cout << "Triangulation method: " << getTriangulationMethod() << "\n";
         cout << "loading models\n";
         std::map<std::string, Object> objects = loadModels("../Models/");
         cout << "models loaded\n";
@@ -118,6 +126,15 @@ int main(){
         time = time - minutes;
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(time).count();
         cout << "render time: " << hours.count() << ":" << minutes.count() << ":" << seconds << "\n";
+        auto initEnd = std::chrono::system_clock::now();
+        auto timeInit = initEnd - initStart;
+        auto initHours = std::chrono::duration_cast<std::chrono::hours>(timeInit);
+        timeInit = timeInit - initHours;
+        auto initMinutes = std::chrono::duration_cast<std::chrono::minutes>(timeInit);
+        timeInit = timeInit - initMinutes;
+        auto initSeconds = std::chrono::duration_cast<std::chrono::seconds>(timeInit).count();
+        cout << "initialisation time: " << initHours.count() << ":" << initMinutes.count() << ":" << initSeconds << "\n";
+
     }
     catch(string message){
         cerr << "exception occurred, message: " << message << "\n";
