@@ -7,7 +7,8 @@
                 "${workspaceFolder}/headerFiles",
                 "${workspaceFolder}/src",
                 "/opt/homebrew/include",
-                "/opt/homebrew/include/eigen3"
+                "/opt/homebrew/include/eigen3",
+                "/opt/homebrew/opt/opencv/include/opencv4"
             ],
             "defines": [],
             "macFrameworkPath": [
@@ -17,7 +18,8 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "macos-clang-x64",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "configurationProvider": "ms-vscode.cpptools"
         }
     ],
     "version": 4
